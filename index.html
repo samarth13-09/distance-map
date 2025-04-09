@@ -1,0 +1,96 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+  <title>📍 Distance Map & Route Viewer</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.css" />
+  <style>
+    body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
+    #map { height: 70vh; width: 100%; }
+    .controls { padding: 10px; background: #f9f9f9; }
+    input, button {
+      padding: 8px;
+      margin: 5px 0;
+      width: 90%;
+      max-width: 300px;
+      display: block;
+    }
+    button { background-color: #4CAF50; color: white; border: none; cursor: pointer; }
+    button:hover { background-color: #45a049; }
+    #result { margin-top: 10px; font-weight: bold; }
+  </style>
+</head>
+<body>
+
+<div class="controls">
+  <h2>📏 Distance & Route Finder</h2>
+  <input type="text" id="place1" placeholder="🔍 Start Location (e.g., Karad)" />
+  <input type="text" id="place2" placeholder="📍 Destination (e.g., Pune)" />
+  <button onclick="searchLocations()">Get Distance & Route</button>
+  <div id="result"></div>
+</div>
+<div id="map"></div>
+
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.min.js"></script>
+<script>
+  const map = L.map('map').setView([18.5204, 73.8567], 7);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap contributors'
+  }).addTo(map);
+
+  let control;
+  let lat1, lon1, lat2, lon2;
+
+  function toRad(val) {
+    return val * Math.PI / 180;
+  }
+
+  function calculateDistance() {
+    const R = 6371;
+    const dLat = toRad(lat2 - lat1);
+    const dLon = toRad(lon2 - lon1);
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+              Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+              Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  }
+
+  function searchLocations() {
+    const start = document.getElementById('place1').value;
+    const end = document.getElementById('place2').value;
+    if (!start || !end) return alert("Please enter both locations");
+
+    fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(start)}`)
+      .then(res => res.json())
+      .then(data1 => {
+        if (!data1[0]) return alert("Start location not found");
+        lat1 = parseFloat(data1[0].lat);
+        lon1 = parseFloat(data1[0].lon);
+
+        fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(end)}`)
+          .then(res => res.json())
+          .then(data2 => {
+            if (!data2[0]) return alert("End location not found");
+            lat2 = parseFloat(data2[0].lat);
+            lon2 = parseFloat(data2[0].lon);
+
+            const dist = calculateDistance().toFixed(2);
+            document.getElementById('result').innerText = `📍 Aerial Distance: ${dist} km`;
+
+            if (control) map.removeControl(control);
+            control = L.Routing.control({
+              waypoints: [L.latLng(lat1, lon1), L.latLng(lat2, lon2)],
+              routeWhileDragging: false
+            }).addTo(map);
+            map.setView([lat1, lon1], 8);
+          });
+      });
+  }
+</script>
+
+</body>
+</html>
